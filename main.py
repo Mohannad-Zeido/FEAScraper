@@ -1,23 +1,18 @@
-# from selenium import webdriver
-# from selenium.webdriver.common.by import By
-# from selenium.webdriver.common.keys import Keys
-# from selenium.webdriver.support.ui import Select
-# from webdriver_manager.chrome import ChromeDriverManager
-# from selenium.webdriver.chrome.service import Service
-# from helpers import web_helper
 import requests
 from bs4 import BeautifulSoup
-
+import time
+import random
+import csv
 
 global driver
 clinics_dict = {}
 base_url = 'https://www.hfea.gov.uk'
 '/choose-a-clinic/clinic-search/results/9129/'
 all_clinics_url_segment = '/choose-a-clinic/clinic-search/all-clinics/?alpha='
-clinic_statistics_url_segment = 'statistics/?age=35-37&treatment=ivf_icsi&year=2018&source=FSO'
+clinic_statistics_url_segment = 'statistics/?age=o44&treatment=ivf_icsi&year=2018&source=FSO'
 letters = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
            'w', 'x', 'y', 'z']
-age_groups = ['35-37', '38-39', '40-42', '43-44', 'b35', 'o44']
+age_groups = ['b35', '35-37', '38-39', '40-42', '43-44', 'o44']
 
 
 def build_all_clinics_url(letter):
@@ -44,15 +39,20 @@ def get_clinics(letter):
     for links in asd:
         url = links.get('href')
         if "choose-a-clinic/clinic-search/result" in url:
-            clinics_dict[url] = url
-    print(clinics_dict)
+            clinics_dict[url] = links.text
+    # print(clinics_dict)
 
 
 def get_clinic_details(clinic_url_segment):
     url = build_clinic_statistics_url(clinic_url_segment)
-    print(url)
+
     soup = get_website_content(url)
-    overview_stats = []
+    dsa = soup.find_all('span', {'class': 'stat-large'})
+    if len(dsa) == 0 or dsa[0].text == '**':
+        print(url)
+        return 0
+
+    overview_stats = [clinics_dict[clinic_url_segment]]
     stats = soup.find_all('div', {"class": "overview-stat"})
     for stat in stats:
         figure = stat.find('span', {'class': 'stat-large'})
@@ -69,34 +69,73 @@ def get_clinic_details(clinic_url_segment):
         overview_stats.append(a.text)
 
     s = soup.find('div', {'id': 'collapse-stats-subcollapseThree-1'})
-    table = s.find('table')
+    table = s.find('table', {'class': 'waiting-times-table'})
+    rows = table.find_all('tr')
+    for row in rows:
+        dat = row.find_all('td')
+        a = dat[1].text
+        overview_stats.append(a)
+
+
+    s = soup.find('div', {'id': 'collapse-stats-subcollapseThree-2'})
+    table = s.find('table', {'class': 'waiting-times-table'})
+    rows = table.find_all('tr')
+    for row in rows:
+        dat = row.find_all('td')
+        a = dat[1].text
+        overview_stats.append(a)
+
+
+    s = soup.find('div', {'id': 'collapse-stats-subcollapseThree-3'})
+    table = s.find('table', {'class': 'waiting-times-table'})
+    rows = table.find_all('tr')
+    for row in rows:
+        dat = row.find_all('td')
+        a = dat[1].text
+        overview_stats.append(a)
     print(table)
+    points_of_intrest = [0, 1, 3, 4, 6, 7, 9, 10, 12, 13, 15, 16]
+    pregnancies_and_births = soup.find_all('div', {'class' : 'detailedStats-comparisionContent'})
+    for pregnancies_and_birth in pregnancies_and_births:
+        data_points = pregnancies_and_birth.find_all('div', {'class': 'col-sm-12 col-md-4 col ps-30'})
+        for position in points_of_intrest:
+            if position >= len(data_points):
+                break
+            point = data_points[position]
+            d = point.find('span', {'class': 'h3'})
+            if d is not None:
+                overview_stats.append(d.text)
+            else:
+                e = point.find('span', {'class': 'stat-large clinic-rate mb-20'})
+                overview_stats.append(e.text)
+    f = open('o44.csv', 'a')
+    writer = csv.writer(f)
+    writer.writerow(overview_stats)
+    f.close()
 
     print(overview_stats)
 
 
-
-
-
 def main():
     global driver
-    # for letter in letters:
-    #     get_clinics(letter)
-    # get_clinics(letters[0])
+    for letter in letters:
+        print(letter)
+        get_clinics(letter)
+    # get_clinics(phase__letters[0])
     # print(len(clinics_dict))
-    # for clinic in clinics_dict:
-    #     get_clinic_details(clinic)
-    get_clinic_details('/choose-a-clinic/clinic-search/results/19/')
+    count = 0
+    for clinic in clinics_dict:
+        count = count + 1
+        # count = count + get_clinic_details(clinic)
+        get_clinic_details(clinic)
+        time.sleep(5)
+        # if count >= 10:
+        #     time.sleep(120)
+    # print('total clinics is: ')
+    # print(count)
+    # get_clinic_details('/choose-a-clinic/clinic-search/results/15/')
     # get_clinics(letters[0])
-    # Using Chrome to access web
-    # op = webdriver.ChromeOptions()
-    # # op.add_argument('headless')
-    # s = Service(ChromeDriverManager().install())
-    # driver = webdriver.Chrome(service=s, options=op)
 
 
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     main()
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
